@@ -4,6 +4,17 @@ library(quantmod)
 library(tseries)
 library(forecast)
 
+createDbConnection<-function(dbUsername="root",dbPassword="settrade",dbname="stock_simulator",host="localhost"){
+	dbConnection = dbConnect(MySQL(),user=dbUsername,password=dbPassword,dbname=dbname,host=host)
+	return(dbConnection);
+}
+
+loadData<-function(symbol,from,to,dbConnection=createDbConnection()){
+	data = dbSendQuery(dbConnection,paste("select * from stock_daily_info where symbol = '",symbol,"' and date >= '",from,"' and date<='",to,"'",sep=""))
+	data = fetch(data,n=-1)
+	return(data);
+}
+
 forwardAddition<-function(diff,numFw){
         r = diff
         for(i in 1:numFw){

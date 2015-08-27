@@ -45,11 +45,11 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
     
     for(j in 1:ncol(corr_matrix) ){
         for(i in 1:nrow(corr_matrix) ){
-            if(sd_r0[i]==0 || sd_r1[j]==0){
-                corr_matrix[i,j] = 0;
-            }else{
-                corr_matrix[i,j] = cov_matrix[i,j]/(sd_r0[i]*sd_r1[j]);
-            }
+			if(sd_r0[i]==0 || sd_r1[j]==0){
+				corr_matrix[i,j] = 0;
+			}else{
+				corr_matrix[i,j] = cov_matrix[i,j]/(sd_r0[i]*sd_r1[j]);
+			}
         }
     }
 
@@ -102,8 +102,27 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
 # r     - matrix of daily return of m stocks when starts adopting portfolio b
 #         this is a matrix with m x w dimension
 #         where each row is correspond to a return of each stock
-getPortfolioValue<-function(current_value,r,b){
-    r = cbind(r,b)
-    row_multiply = apply(r,1,prod)
-    return(current_value * sum(row_multiply) )
+# b		- initialized vector of portfolios to use at w(1) (length m). noted that b is not
+#		  rebalanced for subsequent w
+# @return - vector of entire capital values for w period
+getCapitalValues<-function(current_value,r,b){
+	for(i in 1:nrow(r)){
+		r[i,] = cumprod(r[i,]) * b[i]
+	}
+	values = current_value * colSums(r)
+	return(values);
+}
+
+generatePrice<-function(n,mean,sd,p0){
+	diff = rnorm(n,mean=mean,sd=sd)
+	diff[1] = 0
+	return(p0 + cumsum(diff));
+}
+
+getRelativeReturn<-function(x){
+	lag_x = as.vector(Lag(x,1))
+	relative = x / lag_x
+	#no definition for the first sequence
+	relative[1] = 1
+	return(relative);
 }
