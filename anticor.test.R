@@ -34,35 +34,33 @@ test.getRelativeReturn<-function(){
 	getRelativeReturn(price)
 }
 
-test.simulation<-function(){
+test.simulation<-function(stocks,w=5,from="2014-01-01",to="2015-12-31",capital=100){
 	dbConnection = createDbConnection();
 	
-	#p0 = generatePrice(n=100,mean=0,sd=5,p0=1000)
-	p0 = loadData("ADVANC",from="2014-01-01",to="2015-12-31",dbConnection)$CLOSE
-	relative_p0 = getRelativeReturn(p0)
+	r = sapply(stocks,function(stock){
+				close = loadData(stock,from=from,to=to,dbConnection)$CLOSE;
+				return(close);
+			});
 	
-	#p1 = generatePrice(n=100,mean=0,sd=10,p0=1000)
-	p1 = loadData("BANPU",from="2014-01-01",to="2015-12-31",dbConnection)$CLOSE
-	relative_p1 = getRelativeReturn(p1)
+	#if we get data with unequal length, r will be converted to list(instead of matrix)
+	if(class(r) == "list"){
+		print("some of the stocks have unequal data length");
+		return();
+	}
 	
-	#p2 = generatePrice(n=100,mean=0,sd=15,p0=1000)
-	p2 = loadData("BCP",from="2014-01-01",to="2015-12-31",dbConnection)$CLOSE
-	relative_p2 = getRelativeReturn(p2)
+	for(col_index in 1:ncol(r)){
+		r[,col_index] = getRelativeReturn(r[,col_index]);
+	}
+	r = t(r)
 	
-	#p3 = generatePrice(n=100,mean=0,sd=20,p0=1000)
-	p3 = loadData("BH",from="2014-01-01",to="2015-12-31",dbConnection)$CLOSE
-	relative_p3 = getRelativeReturn(p3)
-	
-	r = rbind(relative_p0,relative_p1,relative_p2,relative_p3)
-	b = c(0.25,0.25,0.25,0.25)
-	w = 3
-	capital = 1000
+	uniform_b = rep(1/length(stocks),times=length(stocks))
 	asset = c()
 	
 	#get total asset value when anti-cor is not ready
+	b = uniform_b
 	asset = getCapitalValues(capital,r[,1:((2*w) - 1)],b)
 	
-	for(index in (2*w):(length(p0)-1)){
+	for(index in (2*w):(ncol(r)-1)){
 		m_r0 = r[,((index - w + 1) - w):(index - w)]
 		m_r1 = r[,(index - w + 1):index]
 		
@@ -74,20 +72,20 @@ test.simulation<-function(){
 		asset = c(asset,new_asset_value)
 	}
 	
-	benchmark = getCapitalValues(capital,r,c(0.25,0.25,0.25,0.25))
+	benchmark = getCapitalValues(capital,r,uniform_b)
 	
-	p0 = p0/p0[1];
-	p1 = p1/p1[1];
-	p2 = p2/p2[1];
-	p3 = p3/p3[1];
-	asset = asset/asset[1];
-	benchmark = benchmark/benchmark[1];
+	test.generateResultGraph(asset,benchmark)
 	
-	all = c(p0,p1,p2,p3,asset,benchmark)
-	plot(p0,type="l",col="green",ylim=c(min(all),max(all)))
-	lines(p1,type="l",col="red")
-	lines(p2,type="l",col="orange")
-	lines(p3,type="l",col="black")
-	lines(asset,type="l",col="blue")
+	closeDbConnection(dbConnection)
+}
+
+test.generateResultGraph <- function(asset,benchmark){
+	asset = asset/asset[1]
+	benchmark = benchmark/benchmark[1]
+	
+	min_value = min(min(asset),min(benchmark))
+	max_value = max(max(asset),max(benchmark))
+	
+	plot(asset,type="l",col="blue",ylim=c(min_value,max_value))
 	lines(benchmark,type="l",col="blue",lty=6)
 }

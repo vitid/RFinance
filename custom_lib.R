@@ -9,8 +9,12 @@ createDbConnection<-function(dbUsername="root",dbPassword="settrade",dbname="sto
 	return(dbConnection);
 }
 
+closeDbConnection<-function(dbConnection){
+	dbDisconnect(dbConnection)
+}
+
 loadData<-function(symbol,from,to,dbConnection=createDbConnection()){
-	data = dbSendQuery(dbConnection,paste("select * from stock_daily_info where symbol = '",symbol,"' and date >= '",from,"' and date<='",to,"'",sep=""))
+	data = dbSendQuery(dbConnection,paste("select * from stock_daily_info where symbol = '",symbol,"' and date >= '",from,"' and date<='",to,"' order by date ",sep=""))
 	data = fetch(data,n=-1)
 	return(data);
 }
