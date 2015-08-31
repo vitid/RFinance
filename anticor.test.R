@@ -34,11 +34,11 @@ test.getRelativeReturn<-function(){
 	getRelativeReturn(price)
 }
 
-test.simulation<-function(stocks,w=5,from="2014-01-01",to="2015-12-31",capital=100){
+test.buyAndHoldAnticor<-function(stock_names,max_w=5,is_fixed_width=FALSE,from="2014-01-01",to="2015-12-31",capital=100){
 	dbConnection = createDbConnection();
 	
-	r = sapply(stocks,function(stock){
-				close = loadData(stock,from=from,to=to,dbConnection)$CLOSE;
+	r = sapply(stock_names,function(stock_name){
+				close = loadData(stock_name,from=from,to=to,dbConnection)$CLOSE;
 				return(close);
 			});
 	
@@ -52,8 +52,32 @@ test.simulation<-function(stocks,w=5,from="2014-01-01",to="2015-12-31",capital=1
 		r[,col_index] = getRelativeReturn(r[,col_index]);
 	}
 	r = t(r)
+	uniform_b = rep(1/length(stock_names),times=length(stock_names))
 	
-	uniform_b = rep(1/length(stocks),times=length(stocks))
+	asset = c()
+	if(is_fixed_width){
+		asset = test.fixedWidthAnticor(stock_names,r,max_w,from,to,capital)
+	}else{
+		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r)-1)),nrow=(max_w-1),ncol=ncol(r)-1)
+		for(i in 2:max_w){
+			asset_w = test.fixedWidthAnticor(stock_names,r,i,from,to,capital);
+			asset_matrix_r[(i-1),] = getRelativeReturn(asset_w);
+		}
+		uniform_w_b = rep(1/(max_w-1),times=(max_w-1))
+		asset = getCapitalValues(capital,asset_matrix_r,uniform_w_b)
+	}
+	
+	benchmark = getCapitalValues(capital,r,uniform_b)
+	
+	test.generateResultGraph(asset,benchmark)
+	closeDbConnection(dbConnection)
+}
+
+test.fixedWidthAnticor<-function(stock_names,stock_relative_returns,w=5,from="2014-01-01",to="2015-12-31",capital=100){
+	
+	r = stock_relative_returns
+	
+	uniform_b = rep(1/length(stock_names),times=length(stock_names))
 	asset = c()
 	
 	#get total asset value when anti-cor is not ready
@@ -71,12 +95,8 @@ test.simulation<-function(stocks,w=5,from="2014-01-01",to="2015-12-31",capital=1
 		new_asset_value = getCapitalValues(last_asset_value,as.matrix(r[,index+1]),b)
 		asset = c(asset,new_asset_value)
 	}
-	
-	benchmark = getCapitalValues(capital,r,uniform_b)
-	
-	test.generateResultGraph(asset,benchmark)
-	
-	closeDbConnection(dbConnection)
+		
+	return(asset);
 }
 
 test.generateResultGraph <- function(asset,benchmark){
