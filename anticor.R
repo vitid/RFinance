@@ -19,9 +19,7 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
     }
     
     num_instrument = nrow(m_r0)
-    
-    last_r = t(m_r1)[ncol(m_r1),]
-    
+        
     m_r0 = log10(m_r0);
     m_r0 = t(m_r0);
     
@@ -60,22 +58,15 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
             if(mean_r1[i] >= mean_r1[j] && corr_matrix[i,j] > 0){
                 claim[i,j] = claim[i,j] + corr_matrix[i,j]
                 
-                if(corr_matrix[i,i]<0){
+                if(corr_matrix[i,i] < 0){
                     claim[i,j] = claim[i,j] - corr_matrix[i,i]
                 }
-                if(corr_matrix[j,j]<0){
+                if(corr_matrix[j,j] < 0){
                     claim[i,j] = claim[i,j] - corr_matrix[j,j]
                 }
             }
         }
     }
-    
-    #adjust b according to the last trading date
-    adjust_b = c()
-    for(i in 1:length(last_r) ){
-        adjust_b[i] = b[i] * last_r[i]
-    }
-    adjust_b = adjust_b / (b %*% last_r)
     
     rowsum_claim = rowSums(claim)
     transfer = matrix(rep(0,times=num_instrument*num_instrument) ,nrow = num_instrument,ncol = num_instrument );
@@ -86,12 +77,12 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
                 transfer[i,j] = 0
             }else
             {
-                transfer[i,j] = adjust_b[i] * claim[i,j] / rowsum_claim[i]
+                transfer[i,j] = b[i] * claim[i,j] / rowsum_claim[i]
             }
         }
     }
     
-    next_b = adjust_b
+    next_b = b
     for(i in 1:length(next_b) ){
         next_b[i] = next_b[i] - rowSums(transfer)[i] + colSums(transfer)[i]
     }
@@ -111,6 +102,22 @@ getCapitalValues<-function(current_value,r,b){
 	}
 	values = current_value * colSums(r)
 	return(values);
+}
+
+getAdjustedPortfolio<-function(b,r){
+	#convert r back from vector to matrix in case of r has only one column
+	if(class(r) == "numeric"){
+		r = as.matrix(r);
+	}
+	
+	r_cumm_prod = apply(r,1,prod)
+	
+	adjust_b = c()
+	for(i in 1:length(r_cumm_prod) ){
+		adjust_b[i] = b[i] * r_cumm_prod[i]
+	}
+	adjust_b = adjust_b / (b %*% r_cumm_prod);
+	return(adjust_b);
 }
 
 generatePrice<-function(n,mean,sd,p0){

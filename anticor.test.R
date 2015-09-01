@@ -58,7 +58,7 @@ test.buyAndHoldAnticor<-function(stock_names,max_w=5,is_fixed_width=FALSE,from="
 	if(is_fixed_width){
 		asset = test.fixedWidthAnticor(stock_names,r,max_w,from,to,capital)
 	}else{
-		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r)-1)),nrow=(max_w-1),ncol=ncol(r)-1)
+		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r))),nrow=(max_w-1),ncol=ncol(r))
 		for(i in 2:max_w){
 			asset_w = test.fixedWidthAnticor(stock_names,r,i,from,to,capital);
 			asset_matrix_r[(i-1),] = getRelativeReturn(asset_w);
@@ -82,7 +82,8 @@ test.fixedWidthAnticor<-function(stock_names,stock_relative_returns,w=5,from="20
 	
 	#get total asset value when anti-cor is not ready
 	b = uniform_b
-	asset = getCapitalValues(capital,r[,1:((2*w) - 1)],b)
+	asset = getCapitalValues(capital,r[,1:((2*w))],b)
+	b = getAdjustedPortfolio(b,r[,1:((2*w))])
 	
 	for(index in (2*w):(ncol(r)-1)){
 		m_r0 = r[,((index - w + 1) - w):(index - w)]
@@ -94,6 +95,7 @@ test.fixedWidthAnticor<-function(stock_names,stock_relative_returns,w=5,from="20
 		last_asset_value = asset[length(asset)]
 		new_asset_value = getCapitalValues(last_asset_value,as.matrix(r[,index+1]),b)
 		asset = c(asset,new_asset_value)
+		b = getAdjustedPortfolio(b,r[,index+1])
 	}
 		
 	return(asset);
