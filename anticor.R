@@ -60,7 +60,7 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index,is_use_log_return=FALSE,i
     for(j in 1:ncol(claim) ){
         for(i in 1:nrow(claim) ){
 			
-			if(is_consider_same_instrument && i==j){
+			if(!is_consider_same_instrument && i==j){
 				next;
 			}
 			
