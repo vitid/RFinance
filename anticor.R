@@ -12,7 +12,7 @@ source("custom_lib.R")
 # b         - vector of portfolio of m stocks
 # index     - index of current trading day
 # @return   - vector of portfolio of m stocks of the next trading day
-anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
+anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index,is_use_log_return=FALSE,is_consider_same_instrument=FALSE){
     
     if(index < 2*w){
         return(b);
@@ -20,10 +20,14 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
     
     num_instrument = nrow(m_r0)
         
-    m_r0 = log10(m_r0);
+	if(is_use_log_return){
+    	m_r0 = log10(m_r0);
+	}
     m_r0 = t(m_r0);
     
-    m_r1 = log10(m_r1);
+	if(is_use_log_return){
+    	m_r1 = log10(m_r1);
+	}
     m_r1 = t(m_r1);
     
     mean_r0 = colMeans(m_r0)
@@ -55,6 +59,11 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
     
     for(j in 1:ncol(claim) ){
         for(i in 1:nrow(claim) ){
+			
+			if(is_consider_same_instrument && i==j){
+				next;
+			}
+			
             if(mean_r1[i] >= mean_r1[j] && corr_matrix[i,j] > 0){
                 claim[i,j] = claim[i,j] + corr_matrix[i,j]
                 
@@ -82,10 +91,9 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index){
         }
     }
     
-    next_b = b
-    for(i in 1:length(next_b) ){
-        next_b[i] = next_b[i] - rowSums(transfer)[i] + colSums(transfer)[i]
-    }
+	fund_transfer = colSums(transfer) - rowSums(transfer);
+	
+    next_b = b + fund_transfer;
     
     return(next_b);
 }
