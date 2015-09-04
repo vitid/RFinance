@@ -34,33 +34,47 @@ test.getRelativeReturn<-function(){
 	getRelativeReturn(price)
 }
 
-test.buyAndHoldAnticor<-function(stock_names,max_w=5,is_fixed_width=FALSE,from="2014-01-01",to="2015-12-31",capital=100){
+test.getRelativeMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-12-31"){
 	dbConnection = createDbConnection();
 	
-	r = sapply(stock_names,function(stock_name){
-				close = loadData(stock_name,from=from,to=to,dbConnection)$CLOSE;
-				return(close);
-			});
-	
+	r = tryCatch({
+			sapply(stock_names,function(stock_name){
+						close = loadData(stock_name,from=from,to=to,dbConnection)$CLOSE;
+						return(close);
+					});
+	}, error = function(e) {
+			print("can't get relative matrix from DB");
+			return(FALSE);
+	}, finally = {
+		closeDbConnection(dbConnection);
+	});
+		
 	#if we get data with unequal length, r will be converted to list(instead of matrix)
 	if(class(r) == "list"){
-		print("some of the stocks have unequal data length");
-		return();
+		print("some of the instruments have unequal data length");
+		return(FALSE);
 	}
 	
 	for(col_index in 1:ncol(r)){
 		r[,col_index] = getRelativeReturn(r[,col_index]);
 	}
-	r = t(r)
-	uniform_b = rep(1/length(stock_names),times=length(stock_names))
+	r = t(r);
+	
+	return(r);
+}
+
+test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100){
+	
+	instrument_count = nrow(r);
+	uniform_b = rep(1/instrument_count,times=instrument_count)
 	
 	asset = c()
 	if(is_fixed_width){
-		asset = test.fixedWidthAnticor(stock_names,r,max_w,from,to,capital)
+		asset = test.fixedWidthAnticor(r,max_w,capital)
 	}else{
 		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r))),nrow=(max_w-1),ncol=ncol(r))
 		for(i in 2:max_w){
-			asset_w = test.fixedWidthAnticor(stock_names,r,i,from,to,capital);
+			asset_w = test.fixedWidthAnticor(r,i,capital);
 			asset_matrix_r[(i-1),] = getRelativeReturn(asset_w);
 		}
 		uniform_w_b = rep(1/(max_w-1),times=(max_w-1))
@@ -70,20 +84,41 @@ test.buyAndHoldAnticor<-function(stock_names,max_w=5,is_fixed_width=FALSE,from="
 	benchmark = getCapitalValues(capital,r,uniform_b)
 	
 	test.generateResultGraph(asset,benchmark)
-	closeDbConnection(dbConnection)
 }
 
-test.fixedWidthAnticor<-function(stock_names,stock_relative_returns,w=5,from="2014-01-01",to="2015-12-31",capital=100){
+test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31"){
+	r = test.getRelativeMatrixFromDB(stock_names,from,to);
 	
-	r = stock_relative_returns
+	if(!is.matrix(r)){
+		print("can't generate relative-return matrix");
+		return();
+	}
 	
-	uniform_b = rep(1/length(stock_names),times=length(stock_names))
+	test.buyAndHoldAnticor(r,max_w=5,is_fixed_width = TRUE,capital = 100);
+}
+
+#verify the correctness of the implemented algorithm
+#tested data is from this site: https://www.t6labs.com/article/a_winning_portfolio_selection_algorithm/
+test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,capital=100,file_path="SPDR.csv"){
+	r = read.csv(file_path,header=TRUE,colClasses=c(c("NULL"),rep("numeric",times=9)));
+	r = t(r);
+		
+	for(row_index in 1:nrow(r)){
+		r[row_index,] = getRelativeReturn(r[row_index,]);
+	}
+		
+	test.buyAndHoldAnticor(r,max_w,is_fixed_width,capital)
+}
+
+test.fixedWidthAnticor<-function(r,w,capital){
+	
+	instrument_count = nrow(r);	
+	uniform_b = rep(1/instrument_count,times=instrument_count)
 	asset = c()
 	
 	#get total asset value when anti-cor is not ready
 	b = uniform_b
 	asset = getCapitalValues(capital,r[,1:((2*w))],b)
-	b = getAdjustedPortfolio(b,r[,1:((2*w))])
 	
 	for(index in (2*w):(ncol(r)-1)){
 		m_r0 = r[,((index - w + 1) - w):(index - w)]
