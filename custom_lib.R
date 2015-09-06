@@ -33,7 +33,7 @@ fillMissingOHLCV<-function(all_data){
 	all_date_count = length(all_date);
 	
 	if(nrow(all_data) == all_date_count*length(symbols)){
-		return();
+		return(all_data);
 	}
 	
 	all_date_frame = data.frame(DATE=all_date,stringsAsFactors = FALSE);
