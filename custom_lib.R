@@ -4,6 +4,9 @@ library(quantmod)
 library(tseries)
 library(forecast)
 
+#suppress all warning messages...
+options(warn=-1);
+
 createDbConnection<-function(dbUsername="root",dbPassword="settrade",dbname="stock_simulator",host="localhost"){
 	dbConnection = dbConnect(MySQL(),user=dbUsername,password=dbPassword,dbname=dbname,host=host)
 	return(dbConnection);
@@ -42,6 +45,7 @@ fillMissingOHLCV<-function(all_data){
 		}
 		
 		symbol_data = merge(symbol_data,all_date_frame,all=TRUE);
+		symbol_data[,"SYMBOL"] = symbol;
 		symbol_data[,"OPEN"] = na.locf(symbol_data[,"OPEN"]);
 		symbol_data[,"HIGH"] = na.locf(symbol_data[,"HIGH"]);
 		symbol_data[,"LOW"] = na.locf(symbol_data[,"LOW"]);
