@@ -59,6 +59,19 @@ fillMissingOHLCV<-function(all_data){
 	return(all_data);
 }
 
+adf.pairTest<-function(symbol1,symbol2,...){
+	data = loadData(c(symbol1,symbol2),...);
+	data = fillMissingOHLCV(data);
+	
+	close1 = filter(data,SYMBOL==symbol1)$CLOSE;
+	close2 = filter(data,SYMBOL==symbol2)$CLOSE;
+	
+	lm.model = lm(close1 ~ close2 + 0);
+	beta = coef(lm.model)[1];
+	spread = close1 - (close2 * beta);
+	return(adf.test(spread,alternative="stationary", k=0));
+}
+
 forwardAddition<-function(diff,numFw){
         r = diff
         for(i in 1:numFw){
