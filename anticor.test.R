@@ -38,10 +38,19 @@ test.getRelativeMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-
 	dbConnection = createDbConnection();
 	
 	r = tryCatch({
-			sapply(stock_names,function(stock_name){
-						close = loadData(stock_name,from=from,to=to,dbConnection)$CLOSE;
-						return(close);
-					});
+		all_data = loadData(stock_names,from=from,to=to,dbConnection);
+		all_data = fillMissingOHLCV(all_data);
+		
+		all_date = distinct(all_data,DATE)$DATE;
+		all_date_count = length(all_date);
+		
+		price_matrix = matrix(0,nrow=length(stock_names),ncol=all_date_count);
+		for(i in 1:(length(stock_names))){
+			name = stock_names[i];
+			price_matrix[i,] = filter(all_data,SYMBOL==name)$CLOSE;
+		}
+		
+		price_matrix;
 	}, error = function(e) {
 			print("can't get relative matrix from DB");
 			return(FALSE);
@@ -55,10 +64,9 @@ test.getRelativeMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-
 		return(FALSE);
 	}
 	
-	for(col_index in 1:ncol(r)){
-		r[,col_index] = getRelativeReturn(r[,col_index]);
+	for(i in 1:nrow(r)){
+		r[i,] = getRelativeReturn(r[i,]);
 	}
-	r = t(r);
 	
 	return(r);
 }
@@ -86,7 +94,7 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100){
 	test.generateResultGraph(asset,benchmark)
 }
 
-test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31"){
+test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE){
 	r = test.getRelativeMatrixFromDB(stock_names,from,to);
 	
 	if(!is.matrix(r)){
@@ -94,7 +102,7 @@ test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31"){
 		return();
 	}
 	
-	test.buyAndHoldAnticor(r,max_w=5,is_fixed_width = TRUE,capital = 100);
+	test.buyAndHoldAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital = 100);
 }
 
 #verify the correctness of the implemented algorithm
