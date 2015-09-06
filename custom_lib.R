@@ -23,25 +23,36 @@ loadData<-function(symbols,from,to,dbConnection=createDbConnection()){
 
 #stock_data - data.frame contains columns c("DATE","SYMBOL","OPEN","HIGH","LOW","CLOSE","VOLUME)
 #			  as extracted from DB
-fillMissingOHLCV<-function(stock_data){
+fillMissingOHLCV<-function(all_data){
 	
-	all_date = distinct(stock_data,DATE)$DATE;
-	symbols = distinct(stock_data,SYMBOL)$SYMBOL;
-	col_length = length(all_date);
+	all_date = distinct(all_data,DATE)$DATE;
+	symbols = distinct(all_data,SYMBOL)$SYMBOL;
+	all_date_count = length(all_date);
 	
-	if(nrow(stock_data) == col_length*length(symbols)){
+	if(nrow(all_data) == all_date_count*length(symbols)){
 		return();
 	}
 	
+	all_date_frame = data.frame(DATE=all_date,stringsAsFactors = FALSE);
+	
 	for(symbol in symbols){
-		symbol_data = filter(stock_data,SYMBOL==symbol)
-		if(nrow(symbol_data) == col_length){
+		symbol_data = filter(all_data,SYMBOL==symbol);
+		if(nrow(symbol_data) == all_date_count){
 			next;
 		}
 		
-		symbol_date = symbol_data$DATE
-		missing_date = setdiff(all_date,symbol_date)
+		symbol_data = merge(symbol_data,all_date_frame,all=TRUE);
+		symbol_data[,"OPEN"] = na.locf(symbol_data[,"OPEN"]);
+		symbol_data[,"HIGH"] = na.locf(symbol_data[,"HIGH"]);
+		symbol_data[,"LOW"] = na.locf(symbol_data[,"LOW"]);
+		symbol_data[,"CLOSE"] = na.locf(symbol_data[,"CLOSE"]);
+		symbol_data[,"VOLUME"] = na.locf(symbol_data[,"VOLUME"]);
+		
+		all_data = filter(all_data,SYMBOL!=symbol);
+		all_data = bind_rows(all_data,symbol_data);
 	}
+	
+	return(all_data);
 }
 
 forwardAddition<-function(diff,numFw){
