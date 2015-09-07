@@ -73,17 +73,23 @@ test.getRelativeMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-
 
 test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100){
 	
-	instrument_count = nrow(r);
-	uniform_b = rep(1/instrument_count,times=instrument_count)
+	num_instrument = nrow(r);
+	uniform_b = rep(1/num_instrument,times=num_instrument)
 	
-	asset = c()
 	if(is_fixed_width){
-		asset = test.fixedWidthAnticor(r,max_w,capital)
+		result = test.fixedWidthAnticor(r,max_w,capital);
+		asset = result[,"total_asset"]
 	}else{
+		l = list();
 		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r))),nrow=(max_w-1),ncol=ncol(r))
 		for(i in 2:max_w){
-			asset_w = test.fixedWidthAnticor(r,i,capital);
-			asset_matrix_r[(i-1),] = getRelativeReturn(asset_w);
+			result = test.fixedWidthAnticor(r,i,capital);
+			l[[i-1]] = result;
+		}
+		
+		for(i in 1:length(l)){
+			total_asset = l[[i]][,"total_asset"];
+			asset_matrix_r[i,] = getRelativeReturn(total_asset);
 		}
 		uniform_w_b = rep(1/(max_w-1),times=(max_w-1))
 		asset = getCapitalValues(capital,asset_matrix_r,uniform_w_b)
@@ -91,7 +97,7 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100){
 	
 	benchmark = getCapitalValues(capital,r,uniform_b)
 	
-	test.generateResultGraph(asset,benchmark)
+	test.generateResultGraph(asset,benchmark);
 }
 
 test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE){
@@ -118,15 +124,34 @@ test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,capital=100,file_path="S
 	test.buyAndHoldAnticor(r,max_w,is_fixed_width,capital)
 }
 
-test.fixedWidthAnticor<-function(r,w,capital){
+#@return	data.frame, which has following column:
+#			(if is_return_b == TRUE): c(total_asset,b_of_instrument_1,b_of_instrument_2,...,b_of_instrument_i)
+#			or
+#			(if is_return_b == FALSE): c(total_asset)
+#			each row account for data in that period
+test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
 	
-	instrument_count = nrow(r);	
-	uniform_b = rep(1/instrument_count,times=instrument_count)
+	num_instrument = nrow(r);
+	num_period = ncol(r);
+	uniform_b = rep(1/num_instrument,times=num_instrument)
 	asset = c()
+	
+	return.data = data.frame("total_asset"=numeric(num_period));
+	if(is_return_b){
+		for(i in 1:num_instrument){
+			return.data[,as.character(i)] = numeric(num_period);
+		}
+	}
 	
 	#get total asset value when anti-cor is not ready
 	b = uniform_b
 	asset = getCapitalValues(capital,r[,1:((2*w))],b)
+	
+	if(is_return_b){
+		#set uniform portfolio value to data from the begining period to a period before using anti-cor
+		#skip the first column because that is total_asset column
+		return.data[1:(2*w),2:(num_instrument+1)] = b[1];
+	}
 	
 	for(index in (2*w):(ncol(r)-1)){
 		m_r0 = r[,((index - w + 1) - w):(index - w)]
@@ -135,13 +160,18 @@ test.fixedWidthAnticor<-function(r,w,capital){
 		b = anticor.getNextPortfolio(w,m_r0,m_r1,b,index)
 		b[which(b<0)] = 0
 		
+		if(is_return_b){
+			return.data[index,2:(num_instrument+1)] = b;
+		}
+		
 		last_asset_value = asset[length(asset)]
 		new_asset_value = getCapitalValues(last_asset_value,as.matrix(r[,index+1]),b)
 		asset = c(asset,new_asset_value)
 		b = getAdjustedPortfolio(b,r[,index+1])
 	}
 		
-	return(asset);
+	return.data[,"total_asset"] = asset;
+	return(return.data);
 }
 
 test.generateResultGraph <- function(asset,benchmark){
