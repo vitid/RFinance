@@ -71,19 +71,16 @@ test.getRelativeMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-
 	return(r);
 }
 
-test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100){
-	
-	num_instrument = nrow(r);
-	uniform_b = rep(1/num_instrument,times=num_instrument)
+test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
 	
 	if(is_fixed_width){
-		result = test.fixedWidthAnticor(r,max_w,capital);
-		asset = result[,"total_asset"]
+		result = test.fixedWidthAnticor(r,max_w,capital,is_return_b);
+		return(result);
 	}else{
 		l = list();
 		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r))),nrow=(max_w-1),ncol=ncol(r))
 		for(i in 2:max_w){
-			result = test.fixedWidthAnticor(r,i,capital);
+			result = test.fixedWidthAnticor(r,i,capital,is_return_b);
 			l[[i-1]] = result;
 		}
 		
@@ -91,16 +88,29 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100){
 			total_asset = l[[i]][,"total_asset"];
 			asset_matrix_r[i,] = getRelativeReturn(total_asset);
 		}
-		uniform_w_b = rep(1/(max_w-1),times=(max_w-1))
-		asset = getCapitalValues(capital,asset_matrix_r,uniform_w_b)
+		uniform_w_b = rep(1/(max_w-1),times=(max_w-1));
+		asset = getCapitalValues(capital,asset_matrix_r,uniform_w_b);
+		result = data.frame(total_asset=asset);
+		
+		if(is_return_b){
+			l_b = lapply(l,function(data){
+						data[,"total_asset"] * data[,c(2:ncol(data))];
+					});
+			total_b = Reduce("+",l_b);
+			l_asset = lapply(l,function(data){
+						data[,"total_asset"];
+					});
+			sum_total_asset = Reduce("+",l_asset);
+			weighted_b = total_b / sum_total_asset;
+			result = cbind(result,weighted_b);
+		}
+		
+		return(result);
 	}
 	
-	benchmark = getCapitalValues(capital,r,uniform_b)
-	
-	test.generateResultGraph(asset,benchmark);
 }
 
-test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE){
+test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE,capital=100,...){
 	r = test.getRelativeMatrixFromDB(stock_names,from,to);
 	
 	if(!is.matrix(r)){
@@ -108,12 +118,20 @@ test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,
 		return();
 	}
 	
-	test.buyAndHoldAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital = 100);
+	result = test.buyAndHoldAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital,...);
+	
+	num_instrument = nrow(r);
+	uniform_b = rep(1/num_instrument,times=num_instrument)
+	
+	asset = result[,"total_asset"];
+	benchmark = getCapitalValues(capital,r,uniform_b);
+	
+	test.generateResultGraph(asset,benchmark);
 }
 
 #verify the correctness of the implemented algorithm
 #tested data is from this site: https://www.t6labs.com/article/a_winning_portfolio_selection_algorithm/
-test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,capital=100,file_path="SPDR.csv"){
+test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,file_path="SPDR.csv",capital=100,...){
 	r = read.csv(file_path,header=TRUE,colClasses=c(c("NULL"),rep("numeric",times=9)));
 	r = t(r);
 		
@@ -121,7 +139,15 @@ test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,capital=100,file_path="S
 		r[row_index,] = getRelativeReturn(r[row_index,]);
 	}
 		
-	test.buyAndHoldAnticor(r,max_w,is_fixed_width,capital)
+	result = test.buyAndHoldAnticor(r,max_w,is_fixed_width,capital,...);
+	
+	num_instrument = nrow(r);
+	uniform_b = rep(1/num_instrument,times=num_instrument)
+	
+	asset = result[,"total_asset"];
+	benchmark = getCapitalValues(capital,r,uniform_b);
+	
+	test.generateResultGraph(asset,benchmark);
 }
 
 #@return	data.frame, which has following column:
