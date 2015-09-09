@@ -118,13 +118,9 @@ getAdjustedPortfolio<-function(b,r){
 		r = as.matrix(r);
 	}
 	
-	r_cumm_prod = apply(r,1,prod)
+	r_cumm_prod = apply(r,1,prod);
 	
-	adjust_b = c()
-	for(i in 1:length(r_cumm_prod) ){
-		adjust_b[i] = b[i] * r_cumm_prod[i]
-	}
-	adjust_b = adjust_b / (b %*% r_cumm_prod);
+	adjust_b = (b * r_cumm_prod) / (b %*% r_cumm_prod);
 	return(adjust_b);
 }
 
