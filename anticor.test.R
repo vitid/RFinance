@@ -110,7 +110,7 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_r
 	
 }
 
-test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE,capital=100,...){
+test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
 	r = test.getRelativeMatrixFromDB(stock_names,from,to);
 	
 	if(!is.matrix(r)){
@@ -118,7 +118,7 @@ test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,
 		return();
 	}
 	
-	result = test.buyAndHoldAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital,...);
+	result = test.buyAndHoldAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital,is_return_b,...);
 	
 	num_instrument = nrow(r);
 	uniform_b = rep(1/num_instrument,times=num_instrument)
@@ -126,7 +126,17 @@ test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,
 	asset = result[,"total_asset"];
 	benchmark = getCapitalValues(capital,r,uniform_b);
 	
-	test.generateResultGraph(asset,benchmark);
+	if(is_return_b){
+		par(mfrow = c( 2, 1 ));
+	}else{
+		par(mfrow = c( 1, 1 ));
+	}
+	
+	test.generateBenchmarkGraph(asset,benchmark);
+	
+	if(is_return_b){
+		test.generatePortfolioCompositionPlot(result[,2:ncol(result)]);
+	}
 }
 
 #verify the correctness of the implemented algorithm
@@ -147,7 +157,7 @@ test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,file_path="SPDR.csv",cap
 	asset = result[,"total_asset"];
 	benchmark = getCapitalValues(capital,r,uniform_b);
 	
-	test.generateResultGraph(asset,benchmark);
+	test.generateBenchmarkGraph(asset,benchmark);
 }
 
 #@return	data.frame, which has following column:
@@ -200,7 +210,7 @@ test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
 	return(return.data);
 }
 
-test.generateResultGraph <- function(asset,benchmark){
+test.generateBenchmarkGraph <- function(asset,benchmark){
 	asset = asset/asset[1]
 	benchmark = benchmark/benchmark[1]
 	
@@ -209,4 +219,12 @@ test.generateResultGraph <- function(asset,benchmark){
 	
 	plot(asset,type="l",col="blue",ylim=c(min_value,max_value))
 	lines(benchmark,type="l",col="blue",lty=6)
+}
+
+#data - data.fram as returned from test.fixedWidthAnticor(...)
+#       with column "total_asset" removed
+test.generatePortfolioCompositionPlot <- function(data){
+	data = as.matrix(t(data));
+	#color index start from 2 because 1 is color black and it looks ugly...
+	barplot(data,col=2:(nrow(data)+1));
 }
