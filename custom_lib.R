@@ -59,17 +59,40 @@ fillMissingOHLCV<-function(all_data){
 	return(all_data);
 }
 
-adf.pairTest<-function(symbol1,symbol2,...){
+adf.pairTestFromDB<-function(symbol1,symbol2,...){
 	data = loadData(c(symbol1,symbol2),...);
 	data = fillMissingOHLCV(data);
 	
 	close1 = filter(data,SYMBOL==symbol1)$CLOSE;
 	close2 = filter(data,SYMBOL==symbol2)$CLOSE;
 	
-	lm.model = lm(close1 ~ close2 + 0);
+	return(adf.pairTest(close1,close2));
+}
+
+adf.pairTest<-function(p1,p2){
+	lm.model = lm(p1 ~ p2 + 0);
 	beta = coef(lm.model)[1];
-	spread = close1 - (close2 * beta);
+	spread = p1 - (p2 * beta);
 	return(adf.test(spread,alternative="stationary", k=0));
+}
+
+#price_matrix - data.frame which have following columns:
+#				c(price_0,price_1,price_2,...,price_n)
+#				and each row is data of each instrument
+#symbols		- vector consists of symbol names(lenght is thus 
+#				  equal to price_matrix's number of row)
+getClusterCoIntegratedData<-function(price_matrix){
+	num = nrow(price_matrix);
+	dst_matrix = matrix(0,nrow=num,ncol=num);
+	
+	for(i in 1:(nrow(dst_matrix)-1)){
+		for(j in (i+1):ncol(dst_matrix)){
+			test_data = adf.pairTest(price_matrix[i,],price_matrix[j,]);
+			dst_matrix[i,j] = test_data[["p.value"]];
+			dst_matrix[j,i] = dst_matrix[i,j];
+		}
+	}
+	return(dst_matrix);
 }
 
 forwardAddition<-function(diff,numFw){

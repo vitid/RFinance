@@ -34,34 +34,45 @@ test.getRelativeReturn<-function(){
 	getRelativeReturn(price)
 }
 
-test.getRelativeMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-12-31"){
+test.getDataMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-12-31",column="CLOSE"){
 	dbConnection = createDbConnection();
 	
-	r = tryCatch({
-		all_data = loadData(stock_names,from=from,to=to,dbConnection);
-		all_data = fillMissingOHLCV(all_data);
-		
-		all_date = distinct(all_data,DATE)$DATE;
-		all_date_count = length(all_date);
-		
-		price_matrix = matrix(0,nrow=length(stock_names),ncol=all_date_count);
-		for(i in 1:(length(stock_names))){
-			name = stock_names[i];
-			price_matrix[i,] = filter(all_data,SYMBOL==name)$CLOSE;
-		}
-		
-		price_matrix;
-	}, error = function(e) {
-			print("can't get relative matrix from DB");
-			return(FALSE);
-	}, finally = {
-		closeDbConnection(dbConnection);
-	});
-		
+	data = tryCatch({
+				all_data = loadData(stock_names,from=from,to=to,dbConnection);
+				all_data = fillMissingOHLCV(all_data);
+				
+				all_date = distinct(all_data,DATE)$DATE;
+				all_date_count = length(all_date);
+				
+				data_matrix = matrix(0,nrow=length(stock_names),ncol=all_date_count);
+				for(i in 1:(length(stock_names))){
+					name = stock_names[i];
+					data_matrix[i,] = filter(all_data,SYMBOL==name)[[column]];
+				}
+				
+				data_matrix;
+			}, error = function(e) {
+				print("can't get relative matrix from DB");
+				print(e);
+				return(FALSE);
+			}, finally = {
+				closeDbConnection(dbConnection);
+			});
+	
 	#if we get data with unequal length, r will be converted to list(instead of matrix)
-	if(class(r) == "list"){
+	if(class(data) == "list"){
 		print("some of the instruments have unequal data length");
 		return(FALSE);
+	}
+	return(data);
+}
+
+test.getRelativeDataMatrixFromDB <- function(...){
+	r = test.getDataMatrixFromDB(...);
+		
+	if(r == FALSE){
+		print("can't extract relative data matrix");
+		return();
 	}
 	
 	for(i in 1:nrow(r)){
@@ -111,7 +122,7 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_r
 }
 
 test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
-	r = test.getRelativeMatrixFromDB(stock_names,from,to);
+	r = test.getRelativeDataMatrixFromDB(stock_names,from,to,column="CLOSE");
 	
 	if(!is.matrix(r)){
 		print("can't generate relative-return matrix");
