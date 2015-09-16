@@ -24,6 +24,19 @@ loadData<-function(symbols,from,to,dbConnection=createDbConnection()){
 	return(data);
 }
 
+getAvailableSymbols<-function(from,to,dbConnection){
+	data = dbSendQuery(dbConnection,paste("SELECT MIN(DATE) as min_date,MAX(DATE) as max_date FROM stock_daily_info WHERE DATE BETWEEN '",from,"' AND '",to,"' ",sep=""));
+	data = fetch(data,n=-1);
+	min_date = data$min_date;
+	max_date = data$max_date;
+	
+	sql = paste("SELECT s1.SYMBOL as symbol FROM stock_daily_info AS s1 INNER JOIN stock_daily_info AS s2 WHERE s1.DATE = '",min_date,"' AND s2.DATE = '",max_date,"' AND s1.SYMBOL = s2.SYMBOL" , sep="");
+				
+	data = dbSendQuery(dbConnection,sql);
+	data = fetch(data,n=-1);
+	return(data$symbol);
+}
+
 #stock_data - data.frame contains columns c("DATE","SYMBOL","OPEN","HIGH","LOW","CLOSE","VOLUME)
 #			  as extracted from DB
 fillMissingOHLCV<-function(all_data){
@@ -93,6 +106,12 @@ getClusterCoIntegratedData<-function(price_matrix){
 		}
 	}
 	return(dst_matrix);
+}
+
+#noted that from my observation, cluster of correlated
+#data is less reliable than cluster of cointegrated data...
+getClusterCorrelatedData<-function(r_matrix){
+	return(cor(t(r_matrix)));
 }
 
 forwardAddition<-function(diff,numFw){
