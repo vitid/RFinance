@@ -1,4 +1,4 @@
-# TODO: Add comment
+# Operations involve portfolio(portfolio adjustment, evaluate total asset, etc.)
 # 
 # Author: vitid
 ###############################################################################

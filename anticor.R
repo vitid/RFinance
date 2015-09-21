@@ -1,10 +1,3 @@
-library(RMySQL)
-library(dplyr)
-library(quantmod)
-library(tseries)
-library(forecast)
-source("custom_lib.R")
-
 # w         - window size
 # m_r0,m_r1 - matrix of daily return of m stocks in w period
 #             this is a matrix with m x w dimension
@@ -96,44 +89,4 @@ anticor.getNextPortfolio<-function(w,m_r0,m_r1,b,index,is_use_log_return=FALSE,i
     next_b = b + fund_transfer;
     
     return(next_b);
-}
-
-# r     - matrix of daily return of m stocks when starts adopting portfolio b
-#         this is a matrix with m x w dimension
-#         where each row is correspond to a return of each stock
-# b		- initialized vector of portfolios to use at w(1) (length m). noted that b is not
-#		  rebalanced for subsequent w
-# @return - vector of entire capital values for w period
-getCapitalValues<-function(current_value,r,b){
-	for(i in 1:nrow(r)){
-		r[i,] = cumprod(r[i,]) * b[i]
-	}
-	values = current_value * colSums(r)
-	return(values);
-}
-
-getAdjustedPortfolio<-function(b,r){
-	#convert r back from vector to matrix in case of r has only one column
-	if(class(r) == "numeric"){
-		r = as.matrix(r);
-	}
-	
-	r_cumm_prod = apply(r,1,prod);
-	
-	adjust_b = (b * r_cumm_prod) / (b %*% r_cumm_prod);
-	return(adjust_b);
-}
-
-generatePrice<-function(n,mean,sd,p0){
-	diff = rnorm(n,mean=mean,sd=sd)
-	diff[1] = 0
-	return(p0 + cumsum(diff));
-}
-
-getRelativeReturn<-function(x){
-	lag_x = as.vector(Lag(x,1))
-	relative = x / lag_x
-	#no definition for the first sequence
-	relative[1] = 1
-	return(relative);
 }

@@ -1,14 +1,13 @@
-# TODO: Add comment
-# 
-# Author: vitid
-###############################################################################
+source("support\\instrumentData.R");
+source("support\\portfolioData.R");
+source("support\\tsFunction.R");
+source("support\\graphicFunction.R");
 
-source("custom_lib.R");
-source("anticor.test.R");
-source("anticor.R");
+#suppress all warning messages...
+options(warn=-1);
 
-testMomentumStrategy<-function(stock_names,from="2014-01-01",to="2016-01-01",capital=100,window_size=22,lookback_window=1,select_proportion=0.2){
-	r = test.getRelativeDataMatrixFromDB(stock_names,from,to,column="CLOSE");
+test.momentum<-function(stock_names,from="2014-01-01",to="2016-01-01",capital=100,window_size=22,lookback_window=1,select_proportion=0.2){
+	r = getRelativeDataMatrixFromDB(stock_names,from,to,column="CLOSE");
 	
 	if(!is.matrix(r)){
 		print("can't generate relative-return matrix");
@@ -48,5 +47,5 @@ testMomentumStrategy<-function(stock_names,from="2014-01-01",to="2016-01-01",cap
 	
 	benchmark = getCapitalValues(capital,r,uniform_b);
 	
-	test.generateBenchmarkGraph(asset,benchmark);
+	GF.generateBenchmarkGraph(asset,benchmark);
 }

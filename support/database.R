@@ -1,4 +1,4 @@
-# TODO: Add comment
+# local db connection
 # 
 # Author: vitid
 ###############################################################################
@@ -11,4 +11,12 @@ createDbConnection<-function(dbUsername="root",dbPassword="settrade",dbname="sto
 
 closeDbConnection<-function(dbConnection){
 	dbDisconnect(dbConnection);
+}
+
+loadData<-function(symbols,from,to,dbConnection=createDbConnection()){
+	symbols = sapply(symbols,function(name){return(paste("'",name,"'",sep=""));});
+	symbols_txt = paste(symbols,collapse = ",",sep="")
+	data = dbSendQuery(dbConnection,paste("select * from stock_daily_info where symbol in (",symbols_txt,") and date between '",from,"' and '",to,"' order by date ",sep=""))
+	data = fetch(data,n=-1)
+	return(data);
 }

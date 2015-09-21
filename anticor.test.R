@@ -1,55 +1,14 @@
 source("anticor.R");
-source("custom_lib.R");
+source("support\\instrumentData.R");
+source("support\\portfolioData.R");
+source("support\\tsFunction.R");
+source("support\\graphicFunction.R");
 
-test.getDataMatrixFromDB <- function(stock_names,from="2014-01-01",to="2015-12-31",column="CLOSE"){
-	dbConnection = createDbConnection();
-	
-	data = tryCatch({
-				all_data = loadData(stock_names,from=from,to=to,dbConnection);
-				all_data = fillMissingOHLCV(all_data);
-				
-				all_date = distinct(all_data,DATE)$DATE;
-				all_date_count = length(all_date);
-				
-				data_matrix = matrix(0,nrow=length(stock_names),ncol=all_date_count);
-				for(i in 1:(length(stock_names))){
-					name = stock_names[i];
-					data_matrix[i,] = filter(all_data,SYMBOL==name)[[column]];
-				}
-				
-				data_matrix;
-			}, error = function(e) {
-				print("can't get relative matrix from DB");
-				print(e);
-				return(FALSE);
-			}, finally = {
-				closeDbConnection(dbConnection);
-			});
-	
-	#if we get data with unequal length, r will be converted to list(instead of matrix)
-	if(class(data) == "list"){
-		print("some of the instruments have unequal data length");
-		return(FALSE);
-	}
-	return(data);
-}
+#suppress all warning messages...
+options(warn=-1);
 
-test.getRelativeDataMatrixFromDB <- function(...){
-	r = test.getDataMatrixFromDB(...);
-		
-	if(r == FALSE){
-		print("can't extract relative data matrix");
-		return();
-	}
-	
-	for(i in 1:nrow(r)){
-		r[i,] = getRelativeReturn(r[i,]);
-	}
-	
-	return(r);
-}
-
-test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
+#Interface to test Anti-Cor strategy
+test.basketAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
 	
 	if(is_fixed_width){
 		result = test.fixedWidthAnticor(r,max_w,capital,is_return_b);
@@ -64,7 +23,7 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_r
 		
 		for(i in 1:length(l)){
 			total_asset = l[[i]][,"total_asset"];
-			asset_matrix_r[i,] = getRelativeReturn(total_asset);
+			asset_matrix_r[i,] = getRelative(total_asset);
 		}
 		uniform_w_b = rep(1/(max_w-1),times=(max_w-1));
 		asset = getCapitalValues(capital,asset_matrix_r,uniform_w_b);
@@ -88,6 +47,7 @@ test.buyAndHoldAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_r
 	
 }
 
+#Should be called via test.basketAnticor(...)
 #@return	data.frame, which has following column:
 #			(if is_return_b == TRUE): c(total_asset,b_of_instrument_1,b_of_instrument_2,...,b_of_instrument_i)
 #			or
@@ -138,15 +98,15 @@ test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
 	return(return.data);
 }
 
-test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
-	r = test.getRelativeDataMatrixFromDB(stock_names,from,to,column="CLOSE");
+test.testWithDB<-function(stock_names,from="2014-01-01",to="2016-01-01",max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
+	r = getRelativeDataMatrixFromDB(stock_names,from,to,column="CLOSE");
 	
 	if(!is.matrix(r)){
 		print("can't generate relative-return matrix");
 		return();
 	}
 	
-	result = test.buyAndHoldAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital,is_return_b,...);
+	result = test.basketAnticor(r,max_w=max_w,is_fixed_width = is_fixed_width,capital,is_return_b,...);
 	
 	num_instrument = nrow(r);
 	uniform_b = rep(1/num_instrument,times=num_instrument)
@@ -160,24 +120,24 @@ test.testWithDB<-function(stock_names,from="2014-01-01",to="2015-12-31",max_w=5,
 		par(mfrow = c( 1, 1 ));
 	}
 	
-	test.generateBenchmarkGraph(asset,benchmark);
+	GF.generateBenchmarkGraph(asset,benchmark);
 	
 	if(is_return_b){
-		test.generatePortfolioCompositionPlot(result[,2:ncol(result)]);
+		GF.generatePortfolioCompositionPlot(result[,2:ncol(result)]);
 	}
 }
 
 #verify the correctness of the implemented algorithm
 #tested data is from this site: https://www.t6labs.com/article/a_winning_portfolio_selection_algorithm/
-test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,file_path="SPDR.csv",capital=100,...){
+test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,file_path="data//SPDR.csv",capital=100,...){
 	r = read.csv(file_path,header=TRUE,colClasses=c(c("NULL"),rep("numeric",times=9)));
 	r = t(r);
 		
 	for(row_index in 1:nrow(r)){
-		r[row_index,] = getRelativeReturn(r[row_index,]);
+		r[row_index,] = getRelative(r[row_index,]);
 	}
 		
-	result = test.buyAndHoldAnticor(r,max_w,is_fixed_width,capital,...);
+	result = test.basketAnticor(r,max_w,is_fixed_width,capital,...);
 	
 	num_instrument = nrow(r);
 	uniform_b = rep(1/num_instrument,times=num_instrument)
@@ -185,24 +145,5 @@ test.testWithFile<-function(max_w=6,is_fixed_width=TRUE,file_path="SPDR.csv",cap
 	asset = result[,"total_asset"];
 	benchmark = getCapitalValues(capital,r,uniform_b);
 	
-	test.generateBenchmarkGraph(asset,benchmark);
-}
-
-test.generateBenchmarkGraph <- function(asset,benchmark){
-	asset = asset/asset[1]
-	benchmark = benchmark/benchmark[1]
-	
-	min_value = min(min(asset),min(benchmark))
-	max_value = max(max(asset),max(benchmark))
-	
-	plot(asset,type="l",col="blue",ylim=c(min_value,max_value))
-	lines(benchmark,type="l",col="blue",lty=6)
-}
-
-#data - data.fram as returned from test.fixedWidthAnticor(...)
-#       with column "total_asset" removed
-test.generatePortfolioCompositionPlot <- function(data){
-	data = as.matrix(t(data));
-	#color index start from 2 because 1 is color black and it looks ugly...
-	barplot(data,col=2:(nrow(data)+1));
+	GF.generateBenchmarkGraph(asset,benchmark);
 }

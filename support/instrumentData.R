@@ -1,10 +1,10 @@
-# TODO: Add comment
+# Operations involve instrument data
 # 
 # Author: vitid
 ###############################################################################
 library(RMySQL);
 library(dplyr);
-library("database.R");
+source("support\\database.R");
 
 getAvailableSymbols<-function(from,to,dbConnection){
 	data = dbSendQuery(dbConnection,paste("SELECT MIN(DATE) as min_date,MAX(DATE) as max_date FROM stock_daily_info WHERE DATE BETWEEN '",from,"' AND '",to,"' ",sep=""));
@@ -92,4 +92,56 @@ getClusterCoIntegratedData<-function(price_matrix){
 #data is less reliable than cluster of cointegrated data...
 getClusterCorrelatedData<-function(r_matrix){
 	return(cor(t(r_matrix)));
+}
+
+#get raw time series data from DB
+#@return - matrix of (m x w) instrument data
+getDataMatrixFromDB <- function(stock_names,from="2014-01-01",to="2016-01-01",column="CLOSE"){
+	dbConnection = createDbConnection();
+	
+	data = tryCatch({
+				all_data = loadData(stock_names,from=from,to=to,dbConnection);
+				all_data = fillMissingOHLCV(all_data);
+				
+				all_date = distinct(all_data,DATE)$DATE;
+				all_date_count = length(all_date);
+				
+				data_matrix = matrix(0,nrow=length(stock_names),ncol=all_date_count);
+				for(i in 1:(length(stock_names))){
+					name = stock_names[i];
+					data_matrix[i,] = filter(all_data,SYMBOL==name)[[column]];
+				}
+				
+				data_matrix;
+			}, error = function(e) {
+				print("can't get relative matrix from DB");
+				print(e);
+				return(FALSE);
+			}, finally = {
+				closeDbConnection(dbConnection);
+			});
+	
+	#if we get data with unequal length, r will be converted to list(instead of matrix)
+	if(class(data) == "list"){
+		print("some of the instruments have unequal data length");
+		return(FALSE);
+	}
+	return(data);
+}
+
+#get relative time series data
+#... - from, to, column to query data from DB
+getRelativeDataMatrixFromDB <- function(...){
+	r = getDataMatrixFromDB(...);
+	
+	if(r == FALSE){
+		print("can't extract relative data matrix");
+		return();
+	}
+	
+	for(i in 1:nrow(r)){
+		r[i,] = getRelative(r[i,]);
+	}
+	
+	return(r);
 }
