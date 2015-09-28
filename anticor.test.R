@@ -11,13 +11,14 @@ options(warn=-1);
 test.basketAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_return_b=FALSE,...){
 	
 	if(is_fixed_width){
-		result = test.fixedWidthAnticor(r,max_w,capital,is_return_b);
+		result = test.fixedWidthAnticor(r,max_w,capital,is_return_b,...);
 		return(result);
 	}else{
 		l = list();
 		asset_matrix_r = matrix(rep(NA,times=(max_w-1)*(ncol(r))),nrow=(max_w-1),ncol=ncol(r))
 		for(i in 2:max_w){
-			result = test.fixedWidthAnticor(r,i,capital,is_return_b);
+			#set init_uniform_length of each sub anti-cor = init_uniform_length of anti-cor with max_w for applicability reason
+			result = test.fixedWidthAnticor(r,i,capital,is_return_b,init_uniform_length = (2*max_w),...);
 			l[[i-1]] = result;
 		}
 		
@@ -53,8 +54,7 @@ test.basketAnticor<-function(r,max_w=5,is_fixed_width=FALSE,capital=100,is_retur
 #			or
 #			(if is_return_b == FALSE): c(total_asset)
 #			each row account for data in that period
-test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
-	
+test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE,update_interval=1,init_uniform_length=(2*w)){
 	num_instrument = nrow(r);
 	num_period = ncol(r);
 	uniform_b = rep(1/num_instrument,times=num_instrument)
@@ -69,7 +69,7 @@ test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
 	
 	#get total asset value when anti-cor is not ready
 	b = uniform_b
-	asset = getCapitalValues(capital,r[,1:((2*w))],b)
+	asset = getCapitalValues(capital,r[,1:init_uniform_length],b)
 	
 	if(is_return_b){
 		#set uniform portfolio value to data from the begining period to a period before using anti-cor
@@ -77,11 +77,30 @@ test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
 		return.data[1:(2*w),2:(num_instrument+1)] = b[1];
 	}
 	
-	for(index in (2*w):(ncol(r)-1)){
+	#don't need to delay for the first update
+	unupdate_days = update_interval;
+	#this is an actual anti-cor portfolio(rebalancing daily with no delay interval)
+	b_daily = b;
+	#this portfolio doesn't perform rebalancing for specified interval
+	b_interval = b;
+	for(index in init_uniform_length:(ncol(r)-1)){
+		
+		unupdate_days = unupdate_days + 1;
+		
 		m_r0 = r[,((index - w + 1) - w):(index - w)]
 		m_r1 = r[,(index - w + 1):index]
 		
-		b = anticor.getNextPortfolio(w,m_r0,m_r1,b,index)
+		b_daily = anticor.getNextPortfolio(w,m_r0,m_r1,b_daily,index);
+		
+		if(unupdate_days >= update_interval){
+			b = b_daily;
+			#adjust interval rebalancing portfolio to catch up with the daily rebalancing portfolio
+			b_interval = b_daily;
+			unupdate_days = 0;
+		}else{
+			#not rebalancing portfolio, just use portfolio that is affected by market prices in the previous day
+			b = b_interval;
+		}
 		b[which(b<0)] = 0
 		
 		if(is_return_b){
@@ -91,7 +110,10 @@ test.fixedWidthAnticor<-function(r,w,capital,is_return_b=FALSE){
 		last_asset_value = asset[length(asset)]
 		new_asset_value = getCapitalValues(last_asset_value,as.matrix(r[,index+1]),b)
 		asset = c(asset,new_asset_value)
-		b = getAdjustedPortfolio(b,r[,index+1])
+		
+		#update portfolios
+		b_daily = getAdjustedPortfolio(b_daily,r[,index+1]);
+		b_interval = getAdjustedPortfolio(b_interval,r[,index+1]);
 	}
 	
 	return.data[,"total_asset"] = asset;
