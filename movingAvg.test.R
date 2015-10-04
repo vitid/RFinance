@@ -2,6 +2,7 @@ source("support\\instrumentData.R");
 source("support\\portfolioData.R");
 source("support\\tsFunction.R");
 source("support\\graphicFunction.R");
+library(e1071);
 
 #suppress all warning messages...
 options(warn=-1);
@@ -37,9 +38,15 @@ test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=10
 	
 	#prepare necessary feature vectors
 	rsi = RSI(close,14);
+	roc = ROC(close,22);
 	#==============================
 	
-	data = data.frame(is_profit=integer(0),day_from_last_exit=integer(0),rsi=numeric(0));
+	data = data.frame(
+			is_profit=integer(0),
+			day_from_last_exit=integer(0),
+			rsi=numeric(0),
+			roc=numeric(0)
+			);
 	
 	#index started at 2 because we need day_from_last_exit info.
 	for(index in 2:length(entry_index)){
@@ -50,13 +57,35 @@ test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=10
 		is_profit = ifelse(exit_price - entry_price > 0,1,0);
 		day_from_last_exit = entry_index[index] - exit_index[index-1];
 		
-		data = rbind(data,data.frame(is_profit,day_from_last_exit,rsi[entry_index[index]]));
+		data = rbind(data,data.frame(is_profit,day_from_last_exit,rsi=rsi[entry_index[index]],roc=roc[entry_index[index]]));
 	}
+		
+	#plot(close,type="l");
+	#lines(upper,col="green");
+	#lines(lower,col="red");
 	
-	print(data);
+	return(data);
 	
-	plot(close,type="l");
-	lines(upper,col="green");
-	lines(lower,col="red");
+}
+
+{
+	symbols = c("PTT");
+	data = data.frame();
+	for(symbol in symbols){
+		dataSymbol = test.movingAvg(symbol,from="2000-01-01",to="2010-01-01");
+		data = rbind(data,dataSymbol);
+	} 
+	data[,"is_profit"] = as.factor(data[,"is_profit"]);
 	
+	svmfit = svm(is_profit ~ .,data=data,kernel="radial",cost=10);
+	
+	predicted = predict(svmfit,data);
+	actual = data[,"is_profit"];
+	table(predicted,actual);
+	
+	data = test.movingAvg("PTT",from="2010-01-01",to="2016-01-01");
+	data[,"is_profit"] = as.factor(data[,"is_profit"]);
+	predicted = predict(svmfit,data);
+	actual = data[,"is_profit"];
+	table(predicted,actual);
 }
