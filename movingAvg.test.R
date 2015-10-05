@@ -9,6 +9,11 @@ options(warn=-1);
 
 test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=100,...){
 	close = getDataMatrixFromDB(c(stock_name),from,to,"CLOSE")[1,];
+	high = getDataMatrixFromDB(c(stock_name),from,to,"HIGH")[1,];
+	low = getDataMatrixFromDB(c(stock_name),from,to,"LOW")[1,];
+	
+	hlc = cbind(High=high,Low=low,Close=close);
+	
 	upper = EMA(close,22);
 	lower = EMA(close,11);
 	
@@ -38,14 +43,14 @@ test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=10
 	
 	#prepare necessary feature vectors
 	rsi = RSI(close,14);
-	roc = ROC(close,22);
+	adx = ADX(hlc,14);
 	#==============================
 	
 	data = data.frame(
 			is_profit=integer(0),
 			day_from_last_exit=integer(0),
 			rsi=numeric(0),
-			roc=numeric(0)
+			adx=numeric(0)
 			);
 	
 	#index started at 2 because we need day_from_last_exit info.
@@ -57,7 +62,13 @@ test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=10
 		is_profit = ifelse(exit_price - entry_price > 0,1,0);
 		day_from_last_exit = entry_index[index] - exit_index[index-1];
 		
-		data = rbind(data,data.frame(is_profit,day_from_last_exit,rsi=rsi[entry_index[index]],roc=roc[entry_index[index]]));
+		data = rbind(data,
+				data.frame(
+						is_profit,
+						day_from_last_exit,
+						rsi=rsi[entry_index[index]],
+						adx=adx[entry_index[index]]
+				));
 	}
 		
 	#plot(close,type="l");
@@ -69,7 +80,7 @@ test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=10
 }
 
 {
-	symbols = c("PTT");
+	symbols = c("SET","MAI","PTT","KBANK");
 	data = data.frame();
 	for(symbol in symbols){
 		dataSymbol = test.movingAvg(symbol,from="2000-01-01",to="2010-01-01");
@@ -83,7 +94,7 @@ test.movingAvg<-function(stock_name,from="2014-01-01",to="2016-01-01",capital=10
 	actual = data[,"is_profit"];
 	table(predicted,actual);
 	
-	data = test.movingAvg("PTT",from="2010-01-01",to="2016-01-01");
+	data = test.movingAvg("BH",from="2010-01-01",to="2016-01-01");
 	data[,"is_profit"] = as.factor(data[,"is_profit"]);
 	predicted = predict(svmfit,data);
 	actual = data[,"is_profit"];
